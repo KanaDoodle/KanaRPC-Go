@@ -16,6 +16,9 @@ const (
 	CompressionGzip
 )
 
+// MaxDecompressedSize bounds memory consumed by a compressed RPC body.
+const MaxDecompressedSize = 16 << 20
+
 // Compressor 压缩接口
 type compressor interface {
 	compress([]byte) ([]byte, error)
@@ -45,7 +48,14 @@ func (g *GzipCompressor) decompress(data []byte) ([]byte, error) {
 	}
 	defer r.Close()
 
-	return io.ReadAll(r)
+	body, err := io.ReadAll(io.LimitReader(r, MaxDecompressedSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > MaxDecompressedSize {
+		return nil, errors.New("decompressed body too large")
+	}
+	return body, nil
 }
 
 var (

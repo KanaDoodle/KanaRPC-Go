@@ -3,9 +3,9 @@ package server
 import (
 	"context"
 	"fmt"
-	"kamaRPC/internal/codec"
-	"kamaRPC/internal/protocol"
-	"kamaRPC/internal/transport"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/codec"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/protocol"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/transport"
 	"log"
 	"reflect"
 )
@@ -31,8 +31,12 @@ func NewHandler(s interface{}, opts ...HandleOption) (*Handler, error) {
 }
 
 func (h *Handler) Process(conn *transport.TCPConnection, msg *protocol.Message, server interface{}) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			h.writeError(conn, msg.Header.RequestID, fmt.Sprintf("handler panic: %v", recovered))
+		}
+	}()
 
-	// log.Println("调试: ", h.server, " ", msg.Header.ServiceName, " ", msg.Header.MethodName)
 	result, err := h.invoke(
 		context.Background(),
 		server,
@@ -80,6 +84,9 @@ func (h *Handler) writeError(conn *transport.TCPConnection, requestID uint64, er
 }
 
 func (h *Handler) invoke(ctx context.Context, service interface{}, serviceName, methodName string, body []byte) (interface{}, error) {
+	if service == nil {
+		return nil, fmt.Errorf("service not found: %s", serviceName)
+	}
 
 	serviceValue := reflect.ValueOf(service)
 	method := serviceValue.MethodByName(methodName)
@@ -126,7 +133,7 @@ func (h *Handler) invoke(ctx context.Context, service interface{}, serviceName, 
 			return nil, errVal.(error)
 		}
 
-		return reply.Elem().Interface(), nil
+		return reply.Interface(), nil
 	}
-	return nil, nil
+	return nil, fmt.Errorf("unsupported method signature: %s.%s", serviceName, methodName)
 }

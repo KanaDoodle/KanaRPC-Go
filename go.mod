@@ -1,6 +1,6 @@
-module kamaRPC
+module github.com/KanaDoodle/KanaRPC-Go
 
-go 1.25.4
+go 1.25.9
 
 require (
 	go.etcd.io/etcd/client/v3 v3.6.7

@@ -4,10 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"kamaRPC/internal/client"
-	"kamaRPC/internal/codec"
-	"kamaRPC/internal/registry"
-	"kamaRPC/pkg/api"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/client"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/codec"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/registry"
+	"github.com/KanaDoodle/KanaRPC-Go/pkg/api"
 	"log"
 	"sort"
 	"sync"
@@ -52,6 +52,7 @@ func main() {
 	c, err := client.NewClient(
 		reg,
 		client.WithClientCodec(codec.JSON),
+		client.WithClientRateLimit(1_000_000),
 	)
 	if err != nil {
 		log.Fatal(err)

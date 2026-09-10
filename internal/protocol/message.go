@@ -3,10 +3,16 @@ package protocol
 import (
 	"encoding/binary"
 	"fmt"
-	"kamaRPC/internal/codec"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/codec"
 )
 
 const Magic uint16 = 0x1234
+
+const (
+	FixedHeaderSize = 10
+	MaxHeaderSize   = 64 << 10
+	MaxBodySize     = codec.MaxDecompressedSize
+)
 
 type Message struct {
 	Header *Header
@@ -15,8 +21,11 @@ type Message struct {
 
 func Encode(msg *Message) ([]byte, error) {
 
-	if msg.Header == nil {
+	if msg == nil || msg.Header == nil {
 		return nil, fmt.Errorf("header is nil")
+	}
+	if len(msg.Body) > MaxBodySize {
+		return nil, fmt.Errorf("body too large: %d bytes", len(msg.Body))
 	}
 
 	bodyBytes := msg.Body
@@ -41,8 +50,14 @@ func Encode(msg *Message) ([]byte, error) {
 
 	headerLen := uint32(len(headerBytes))
 	bodyLen := uint32(len(bodyBytes))
+	if headerLen > MaxHeaderSize {
+		return nil, fmt.Errorf("header too large: %d bytes", headerLen)
+	}
+	if bodyLen > MaxBodySize {
+		return nil, fmt.Errorf("body too large: %d bytes", bodyLen)
+	}
 
-	total := 2 + 4 + 4 + headerLen + bodyLen
+	total := FixedHeaderSize + headerLen + bodyLen
 	buf := make([]byte, total)
 
 	binary.BigEndian.PutUint16(buf[0:2], Magic)
@@ -68,22 +83,40 @@ func DecodeBodyLen(data []byte) uint32 {
 	return binary.BigEndian.Uint32(data)
 }
 
+// DecodeFrameLength validates the fixed header before returning a complete
+// frame length. The limits prevent a malformed peer from making a connection
+// buffer grow without bound.
+func DecodeFrameLength(data []byte) (int, error) {
+	if len(data) < FixedHeaderSize {
+		return 0, fmt.Errorf("data too short")
+	}
+	if binary.BigEndian.Uint16(data[0:2]) != Magic {
+		return 0, fmt.Errorf("invalid magic number")
+	}
+
+	headerLen := binary.BigEndian.Uint32(data[2:6])
+	bodyLen := binary.BigEndian.Uint32(data[6:10])
+	if headerLen > MaxHeaderSize {
+		return 0, fmt.Errorf("header too large: %d bytes", headerLen)
+	}
+	if bodyLen > MaxBodySize {
+		return 0, fmt.Errorf("body too large: %d bytes", bodyLen)
+	}
+
+	return FixedHeaderSize + int(headerLen) + int(bodyLen), nil
+}
+
 // DecodeBytes 从字节数组解码完整的 Message（用于粘包处理）
 func Decode(data []byte) (*Message, error) {
 
-	if len(data) < 10 {
-		return nil, fmt.Errorf("data too short")
-	}
-
-	// 检查 Magic
-	if binary.BigEndian.Uint16(data[0:2]) != Magic {
-		return nil, fmt.Errorf("invalid magic number")
+	totalLen, err := DecodeFrameLength(data)
+	if err != nil {
+		return nil, err
 	}
 
 	headerLen := binary.BigEndian.Uint32(data[2:6])
 	bodyLen := binary.BigEndian.Uint32(data[6:10])
 
-	totalLen := 10 + int(headerLen) + int(bodyLen)
 	if len(data) < totalLen {
 		return nil, fmt.Errorf("incomplete packet")
 	}

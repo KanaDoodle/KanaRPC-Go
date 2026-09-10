@@ -1,6 +1,6 @@
 package protocol
 
-import "kamaRPC/internal/codec"
+import "github.com/KanaDoodle/KanaRPC-Go/internal/codec"
 
 // CodecType 编解码器类型
 type CodecType byte

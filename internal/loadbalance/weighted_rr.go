@@ -1,7 +1,7 @@
 package loadbalance
 
 import (
-	"kamaRPC/internal/registry"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/registry"
 	"log"
 	"sync"
 )
@@ -21,13 +21,12 @@ func NewWeightedRR(weights []int) *WeightedRR {
 		currentWeight: make([]int, len(weights)),
 	}
 
-	copy(w.weights, weights)
-
 	total := 0
-	for _, wt := range weights {
+	for i, wt := range weights {
 		if wt < 0 {
 			wt = 0
 		}
+		w.weights[i] = wt
 		total += wt
 	}
 	w.totalWeight = total
@@ -62,4 +61,10 @@ func (w *WeightedRR) Select(list []registry.Instance) registry.Instance {
 	// 选中最大权重节点
 	w.currentWeight[maxIdx] -= w.totalWeight
 	return list[maxIdx]
+}
+
+func (w *WeightedRR) NewBalancer() LoadBalancer {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return NewWeightedRR(w.weights)
 }

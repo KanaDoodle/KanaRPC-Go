@@ -1,7 +1,7 @@
 package loadbalance
 
 import (
-	"kamaRPC/internal/registry"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/registry"
 	"math/rand"
 	"sync"
 	"time"
@@ -27,3 +27,5 @@ func (r *Random) Select(list []registry.Instance) registry.Instance {
 	defer r.m.Unlock()
 	return list[r.r.Intn(len(list))]
 }
+
+func (*Random) NewBalancer() LoadBalancer { return NewRandom() }

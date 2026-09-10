@@ -3,17 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
-	"kamaRPC/internal/client"
-	"kamaRPC/internal/codec"
-	"kamaRPC/internal/registry"
-	"kamaRPC/internal/transport"
-	"kamaRPC/pkg/api"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/client"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/codec"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/registry"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/transport"
+	"github.com/KanaDoodle/KanaRPC-Go/pkg/api"
 	"log"
 	"time"
 )
 
 func main() {
-	reg, _ := registry.NewRegistry([]string{"localhost:2379"})
+	reg, err := registry.NewRegistry([]string{"localhost:2379"})
+	if err != nil {
+		log.Println("NewRegistry error:", err)
+		return
+	}
 
 	c, err := client.NewClient(
 		reg,

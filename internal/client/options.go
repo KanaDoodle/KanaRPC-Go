@@ -1,8 +1,10 @@
 package client
 
 import (
-	"kamaRPC/internal/codec"
-	"kamaRPC/internal/loadbalance"
+	"errors"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/codec"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/limiter"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/loadbalance"
 	"time"
 )
 
@@ -15,6 +17,17 @@ func WithClientCodec(t codec.Type) ClientOption {
 			return err
 		}
 		c.codec = cc
+		c.codecType = t
+		return nil
+	}
+}
+
+func WithClientRateLimit(rate int) ClientOption {
+	return func(c *Client) error {
+		if rate <= 0 {
+			return errors.New("client rate limit must be positive")
+		}
+		c.limiter = limiter.NewTokenBucket(rate)
 		return nil
 	}
 }
@@ -28,6 +41,11 @@ func WithClientTimeout(d time.Duration) ClientOption {
 
 func WithClientLoadBalancer(lb loadbalance.LoadBalancer) ClientOption {
 	return func(c *Client) error {
+		if _, ok := lb.(interface {
+			NewBalancer() loadbalance.LoadBalancer
+		}); !ok {
+			return errors.New("load balancer must provide NewBalancer for per-service state")
+		}
 		c.lb = lb
 		return nil
 	}

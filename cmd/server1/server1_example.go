@@ -1,10 +1,10 @@
 package main
 
 import (
-	"kamaRPC/internal/codec"
-	"kamaRPC/internal/registry"
-	"kamaRPC/internal/server"
-	"kamaRPC/pkg/api"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/codec"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/registry"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/server"
+	"github.com/KanaDoodle/KanaRPC-Go/pkg/api"
 	"log"
 	"os"
 	"os/signal"
@@ -15,8 +15,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer reg.Close()
 
-	srv, err := server.NewServer(":9090", server.WithServerCodec(codec.JSON))
+	srv, err := server.NewServer(
+		":9090",
+		server.WithServerCodec(codec.JSON),
+		server.WithServerRateLimit(1_000_000),
+	)
 	if err != nil {
 		log.Println("server.NewServer error ", err.Error())
 		return
@@ -39,8 +44,6 @@ func main() {
 	}
 
 	log.Println("server started at :9090")
-	srv.Start()
-
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt)
 
@@ -49,5 +52,9 @@ func main() {
 		log.Println("graceful shutdown...")
 		srv.Shutdown()
 	}()
+
+	if err := srv.Start(); err != nil {
+		log.Fatal(err)
+	}
 
 }

@@ -2,23 +2,27 @@ package transport
 
 import (
 	"context"
-	"kamaRPC/internal/codec"
+	"github.com/KanaDoodle/KanaRPC-Go/internal/codec"
 	"sync"
 	"time"
 )
 
 type Future struct {
-	done  chan struct{}
-	res   []byte
-	err   error
-	mu    sync.Mutex
-	codec codec.Codec
-
-	onComplete func(error)
+	done       chan struct{}
+	res        []byte
+	err        error
+	mu         sync.Mutex
+	codec      codec.Codec
+	completed  bool
+	onComplete []func(error)
 }
 
 func NewFuture() *Future {
 	c, _ := codec.New(codec.JSON)
+	return NewFutureWithCodec(c)
+}
+
+func NewFutureWithCodec(c codec.Codec) *Future {
 	return &Future{
 		done:  make(chan struct{}),
 		codec: c,
@@ -27,15 +31,22 @@ func NewFuture() *Future {
 
 func (f *Future) Done(res []byte, err error) {
 	f.mu.Lock()
+	if f.completed {
+		f.mu.Unlock()
+		return
+	}
 	f.res = res
 	f.err = err
+	f.completed = true
+	callbacks := f.onComplete
+	f.onComplete = nil
+	close(f.done)
 	f.mu.Unlock()
 
-	if f.onComplete != nil {
-		f.onComplete(err)
+	// Callbacks may reenter Done; never invoke user code while holding a lock.
+	for _, callback := range callbacks {
+		callback(err)
 	}
-
-	close(f.done)
 }
 
 func (f *Future) Wait() ([]byte, error) {
@@ -46,7 +57,19 @@ func (f *Future) Wait() ([]byte, error) {
 }
 
 func (f *Future) OnComplete(fn func(error)) {
-	f.onComplete = fn
+	if fn == nil {
+		return
+	}
+
+	f.mu.Lock()
+	if !f.completed {
+		f.onComplete = append(f.onComplete, fn)
+		f.mu.Unlock()
+		return
+	}
+	err := f.err
+	f.mu.Unlock()
+	fn(err)
 }
 
 func (f *Future) WaitWithContext(ctx context.Context) ([]byte, error) {

@@ -7,13 +7,51 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # The registry tests create, compact and revoke leases, so they must never
+    # point at a shared or production etcd. This instance belongs to the job.
+    services:
+      etcd:
+        image: quay.io/coreos/etcd:v3.6.7
+        ports:
+          - 2379:2379
+        env:
+          ETCD_NAME: kanarpc-ci
+          ETCD_DATA_DIR: /etcd-data
+          ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+          ETCD_ADVERTISE_CLIENT_URLS: http://127.0.0.1:2379
+          ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+          ETCD_INITIAL_ADVERTISE_PEER_URLS: http://127.0.0.1:2380
+          ETCD_INITIAL_CLUSTER: kanarpc-ci=http://127.0.0.1:2380
+          ETCD_INITIAL_CLUSTER_STATE: new
+    env:
+      KANARPC_TEST_ETCD: 127.0.0.1:2379
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
-      - run: go test ./...
-      - run: go test -race ./internal/...
-      - run: go test ./internal/protocol -fuzz=FuzzDecodeNeverPanics -fuzztime=5s
+
+      - name: Wait for etcd
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:2379/version > /dev/null; then
+              echo "etcd is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "etcd did not become ready" >&2
+          exit 1
+
       - run: go vet ./...
+
+      # KANARPC_TEST_ETCD is set, so the registry, breaker, client and public
+      # facade integration cases run instead of being skipped.
+      - name: Test
+        run: go test -race -count=1 -timeout=600s ./...
+
+      - name: Fuzz protocol decoder
+        run: go test ./internal/protocol -fuzz=FuzzDecodeNeverPanics -fuzztime=10s

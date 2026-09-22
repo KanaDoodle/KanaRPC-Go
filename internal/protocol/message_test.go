@@ -40,7 +40,7 @@ func TestMessageRoundTrip(t *testing.T) {
 func TestDecodeFrameLengthRejectsOversizedBody(t *testing.T) {
 	fixedHeader := make([]byte, FixedHeaderSize)
 	binary.BigEndian.PutUint16(fixedHeader[0:2], Magic)
-	binary.BigEndian.PutUint32(fixedHeader[6:10], MaxBodySize+1)
+	binary.BigEndian.PutUint32(fixedHeader[6:10], MaxWireBodySize+1)
 
 	if _, err := DecodeFrameLength(fixedHeader); err == nil {
 		t.Fatal("DecodeFrameLength() expected oversized body error")

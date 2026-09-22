@@ -3,6 +3,7 @@ package protocol
 import (
 	"bytes"
 	"encoding/binary"
+	"math/rand"
 	"testing"
 
 	"github.com/KanaDoodle/KanaRPC-Go/internal/codec"
@@ -53,6 +54,46 @@ func TestAuditCompressedBodyAtLimit(t *testing.T) {
 	msg, err := Decode(frame)
 	if err != nil || len(msg.Body) != MaxBodySize {
 		t.Fatalf("body at limit rejected: %v", err)
+	}
+}
+
+// gzip stores incompressible input instead of shrinking it, so a body that is
+// exactly MaxBodySize decompressed is slightly larger on the wire. Encode must
+// still accept it, and Decode must round-trip it.
+func TestAuditIncompressibleBodyAtLimitRoundTrips(t *testing.T) {
+	body := make([]byte, MaxBodySize)
+	// Pseudo-random bytes are effectively incompressible; the all-zero fixture
+	// in TestAuditCompressedBodyAtLimit does not cover this case.
+	if _, err := rand.New(rand.NewSource(1)).Read(body); err != nil {
+		t.Fatal(err)
+	}
+	header := &Header{RequestID: 7, Compression: codec.CompressionGzip}
+
+	frame, err := Encode(&Message{Header: header, Body: body})
+	if err != nil {
+		t.Fatalf("Encode rejected an incompressible body at the decompressed limit: %v", err)
+	}
+	msg, err := Decode(frame)
+	if err != nil {
+		t.Fatalf("Decode rejected a frame produced by Encode: %v", err)
+	}
+	if len(msg.Body) != MaxBodySize || !bytes.Equal(msg.Body, body) {
+		t.Fatalf("round trip changed the body: got %d bytes", len(msg.Body))
+	}
+}
+
+// The wire bound must stay finite even though it is larger than the
+// decompressed bound, and it must be the bound DecodeFrameLength enforces.
+func TestAuditWireBodyBoundIsFinite(t *testing.T) {
+	if MaxWireBodySize <= MaxBodySize {
+		t.Fatalf("MaxWireBodySize (%d) must exceed MaxBodySize (%d) to leave room for gzip overhead",
+			MaxWireBodySize, MaxBodySize)
+	}
+	fixedHeader := make([]byte, FixedHeaderSize)
+	binary.BigEndian.PutUint16(fixedHeader[0:2], Magic)
+	binary.BigEndian.PutUint32(fixedHeader[6:10], uint32(MaxWireBodySize+1))
+	if _, err := DecodeFrameLength(fixedHeader); err == nil {
+		t.Fatal("DecodeFrameLength accepted a wire body above MaxWireBodySize")
 	}
 }
 

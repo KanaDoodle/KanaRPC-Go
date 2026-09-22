@@ -11,7 +11,15 @@ const Magic uint16 = 0x1234
 const (
 	FixedHeaderSize = 10
 	MaxHeaderSize   = 64 << 10
-	MaxBodySize     = codec.MaxDecompressedSize
+	// MaxBodySize bounds the decompressed business body.
+	MaxBodySize = codec.MaxDecompressedSize
+	// MaxWireBodySize bounds the body length field on the wire. gzip stores
+	// incompressible input instead of shrinking it, so a body that is exactly
+	// MaxBodySize decompressed is slightly larger once compressed. Keeping the
+	// wire bound above the decompressed bound is what makes Encode and
+	// DecodeFrameLength agree; the decompressed size is still capped separately
+	// by codec.Decompress.
+	MaxWireBodySize = MaxBodySize + MaxBodySize/100 + 1<<10
 )
 
 type Message struct {
@@ -53,8 +61,8 @@ func Encode(msg *Message) ([]byte, error) {
 	if headerLen > MaxHeaderSize {
 		return nil, fmt.Errorf("header too large: %d bytes", headerLen)
 	}
-	if bodyLen > MaxBodySize {
-		return nil, fmt.Errorf("body too large: %d bytes", bodyLen)
+	if bodyLen > MaxWireBodySize {
+		return nil, fmt.Errorf("wire body too large: %d bytes", bodyLen)
 	}
 
 	total := FixedHeaderSize + headerLen + bodyLen
@@ -99,8 +107,8 @@ func DecodeFrameLength(data []byte) (int, error) {
 	if headerLen > MaxHeaderSize {
 		return 0, fmt.Errorf("header too large: %d bytes", headerLen)
 	}
-	if bodyLen > MaxBodySize {
-		return 0, fmt.Errorf("body too large: %d bytes", bodyLen)
+	if bodyLen > MaxWireBodySize {
+		return 0, fmt.Errorf("wire body too large: %d bytes", bodyLen)
 	}
 
 	return FixedHeaderSize + int(headerLen) + int(bodyLen), nil

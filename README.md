@@ -1,13 +1,24 @@
 # KanaRPC-Go
 
-[![CI](https://github.com/KanaDoodle/KanaRPC-Go/actions/workflows/ci.yml/badge.svg)](https://github.com/KanaDoodle/KanaRPC-Go/actions/workflows/ci.yml)
-[![Go Version](https://img.shields.io/badge/Go-1.25.9-00ADD8?logo=go)](go.mod)
-[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](LICENSE)
-[![Tag](https://img.shields.io/github/v/tag/KanaDoodle/KanaRPC-Go?label=latest&color=orange)](https://github.com/KanaDoodle/KanaRPC-Go/tags)
+<table>
+<tr>
+<td width="132"><img src="docs/mascot.png" alt="KanaRPC 蓝色大肥鱼吉祥物" width="120"></td>
+<td>
 
 用 Go 实现的轻量 RPC 框架，一条 TCP 长连接上跑自定义二进制帧：多路复用、发现、负载均衡、熔断、限流，该有的都有，不该吹的一个不吹。
 
 > 这条鱼是学习型项目，不是生产级框架。它能陪你读完 RPC 的每一层，但别指望它替你在双十一扛流量。
+
+吉祥物是条蓝色大肥鱼，矢量源文件在 [`docs/mascot.svg`](docs/mascot.svg)，可以直接拿去当头像。
+
+</td>
+</tr>
+</table>
+
+[![CI](https://github.com/KanaDoodle/KanaRPC-Go/actions/workflows/ci.yml/badge.svg)](https://github.com/KanaDoodle/KanaRPC-Go/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/badge/Go-1.25.9-00ADD8?logo=go)](go.mod)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](LICENSE)
+[![Tag](https://img.shields.io/github/v/tag/KanaDoodle/KanaRPC-Go?label=latest&color=orange)](https://github.com/KanaDoodle/KanaRPC-Go/tags)
 
 ## 这个项目是什么
 
@@ -278,7 +289,14 @@ pkg/api/         示例服务定义
 - `ClientConfig` 提供调用超时与轮询/随机选择；`Client.Invoke` 接收 context。
 - `Server` 提供处理器注册、`Start`、`Addr` 和 `Shutdown`。
 
-**版本状态**：`v0.1.0` 是公共 facade 的首个发布版本，已推送可解析的 tag。该 tag 之后的 `main` 分支包含一项协议安全修复（把传输层 Body 长度上限与解压后的 Body 上限分开计算，见 commit `1ab72d0`）以及 CI 的 etcd 集成增强；公共 `rpc` facade 的签名**未发生变化**。依赖方需要该修复时请使用 `main` 或等待下一个 tag。
+**版本状态**：公共 facade 的发布系列如下。
+
+| 版本 | 状态 | 内容 |
+| --- | --- | --- |
+| [`v0.1.1`](https://github.com/KanaDoodle/KanaRPC-Go/releases/tag/v0.1.1) | **当前推荐** | 包含协议安全修复：把传输层 Body 长度上限与解压后的 Body 上限分开计算（commit `1ab72d0`），以及 CI 的 etcd 集成增强 |
+| [`v0.1.0`](https://github.com/KanaDoodle/KanaRPC-Go/releases/tag/v0.1.0) | 已废弃，建议升级 | 首个公共 facade 版本，**不含**上述协议安全修复 |
+
+两个版本之间的公共 `rpc` facade 签名**未发生变化**，升级只是替换 tag，无需改代码。仍在使用 `v0.1.0` 的项目建议尽快升级：该修复针对的是压缩体长度校验，属于边界防护范畴。
 
 **依赖建议**：外部项目应依赖本仓库已推送且可解析的版本 tag，并在 `GOWORK=off`、无 sibling checkout 或本地 replace 的环境验证。开发 workspace（`go.work`）仅用于本地联调，不能代替远程版本验收。
 
